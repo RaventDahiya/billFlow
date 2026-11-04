@@ -11,7 +11,9 @@ const SafeAreaView = styled(RNsafeAreaView);
 export default function App() {
   return (
     <SafeAreaView className="flex-1 bg-background p-5">
-      <Text className="text-3xl font-bold text-center text-primary">home</Text>
+      <Text className="text-3xl font-sans-extrabold text-center text-primary">
+        home
+      </Text>
     </SafeAreaView>
   );
 }

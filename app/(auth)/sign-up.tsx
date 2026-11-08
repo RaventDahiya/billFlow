@@ -129,6 +129,7 @@ export default function SignUpScreen() {
       if (error) {
         setFormError(error.message);
       } else {
+        posthog?.capture("verification_code_resent");
         setResendMessage("A new verification code has been sent.");
       }
     } catch (err: any) {

@@ -17,13 +17,21 @@ import React, { useState } from "react";
 import ListHeading from "@/components/ListHeading";
 import UpComingSubscriptionCard from "@/components/UpComingSubscriptionCard";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import { useUser } from "@clerk/expo";
 
 const SafeAreaView = styled(RNsafeAreaView);
 
 export default function App() {
+  const { user } = useUser();
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
+
+  const userName =
+    user?.firstName ||
+    user?.fullName ||
+    user?.emailAddresses[0]?.emailAddress?.split("@")[0] ||
+    HOME_USER.name;
 
   return (
     <SafeAreaView className="flex-1 bg-background p-5">
@@ -32,8 +40,15 @@ export default function App() {
           <>
             <View className="home-header">
               <View className="home-user">
-                <Image source={images.avatar} className="home-avatar" />
-                <Text className="home-user-name">{HOME_USER.name}</Text>
+                {user?.imageUrl ? (
+                  <Image
+                    source={{ uri: user.imageUrl }}
+                    className="home-avatar"
+                  />
+                ) : (
+                  <Image source={images.avatar} className="home-avatar" />
+                )}
+                <Text className="home-user-name">{userName}</Text>
               </View>
               <Image source={icons.add} className="home-add-icon" />
             </View>

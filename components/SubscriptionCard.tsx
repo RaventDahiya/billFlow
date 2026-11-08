@@ -1,8 +1,11 @@
 import { View, Text, Image, Pressable } from "react-native";
 import React from "react";
-import { formatCurrency } from "@/lib/utils";
+import {
+  formatCurrency,
+  formatSubscriptionDateTime,
+  formatStatusLabel,
+} from "@/lib/utils";
 import clsx from "clsx";
-import { formatSubscriptionDateTime, formatStatusLabel } from "@/lib/utils";
 const SubscriptionCard = ({
   name,
   price,

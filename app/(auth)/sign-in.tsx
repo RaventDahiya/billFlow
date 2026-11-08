@@ -15,6 +15,8 @@ import { useSignIn, useSSO } from "@clerk/expo";
 import * as Linking from "expo-linking";
 import clsx from "clsx";
 import { colors } from "@/constants/theme";
+import { posthog } from "@/lib/posthog";
+import { posthogLogger } from "@/lib/posthog-logger";
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -49,6 +51,8 @@ export default function SignInScreen() {
 
       if (signIn.status === "complete") {
         await signIn.finalize();
+        posthog?.capture("user_signed_in", { method: "password" });
+        posthogLogger.info("user signed in", { method: "password" });
         router.replace("/(tabs)");
       } else {
         setFormError(`Sign in requires additional steps: ${signIn.status}`);
@@ -76,6 +80,8 @@ export default function SignInScreen() {
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
+        posthog?.capture("user_signed_in", { method: "google" });
+        posthogLogger.info("user signed in", { method: "google" });
         router.replace("/(tabs)");
       }
     } catch (err: any) {

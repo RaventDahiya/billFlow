@@ -15,6 +15,8 @@ import { useSignUp, useSSO } from "@clerk/expo";
 import * as Linking from "expo-linking";
 import clsx from "clsx";
 import { colors } from "@/constants/theme";
+import { posthog } from "@/lib/posthog";
+import { posthogLogger } from "@/lib/posthog-logger";
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -52,6 +54,8 @@ export default function SignUpScreen() {
 
       if (signUp.status === "complete") {
         await signUp.finalize();
+        posthog?.capture("account_created", { method: "password" });
+        posthogLogger.info("account created", { method: "password" });
         router.replace("/(tabs)");
         return;
       }
@@ -100,6 +104,8 @@ export default function SignUpScreen() {
 
       if (signUp.status === "complete") {
         await signUp.finalize();
+        posthog?.capture("account_created", { method: "email_verification" });
+        posthogLogger.info("account created", { method: "email_verification" });
         router.replace("/(tabs)");
       } else {
         setFormError(`Verification status: ${signUp.status}`);
@@ -142,6 +148,8 @@ export default function SignUpScreen() {
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
+        posthog?.capture("account_created", { method: "google" });
+        posthogLogger.info("account created", { method: "google" });
         router.replace("/(tabs)");
       }
     } catch (err: any) {

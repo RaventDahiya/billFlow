@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser, useClerk } from "@clerk/expo";
 import images from "@/constants/images";
+import { posthog } from "@/lib/posthog";
 
 export default function SettingsScreen() {
   const { user } = useUser();
@@ -16,6 +17,7 @@ export default function SettingsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
+            posthog?.capture("user_signed_out");
             await signOut();
           } catch (err: any) {
             Alert.alert("Error", err?.message ?? "Failed to sign out");

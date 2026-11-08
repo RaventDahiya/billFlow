@@ -1,6 +1,14 @@
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
-import { Stack, useRouter, useSegments, SplashScreen } from "expo-router";
+import {
+  Stack,
+  useRouter,
+  useSegments,
+  SplashScreen,
+  usePathname,
+  useGlobalSearchParams,
+} from "expo-router";
+import { PostHogProvider, usePostHog } from "posthog-react-native";
 import "@/global.css";
 import { useFonts } from "expo-font";
 import { useEffect, useRef } from "react";
@@ -15,11 +23,29 @@ WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+const posthogApiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? "";
 
 if (!publishableKey) {
   throw new Error(
     "Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Add your key to .env.\nRun: 1) clerk auth login  2) clerk link  3) clerk env pull — then restart the dev server."
   );
+}
+
+/**
+ * Automatically captures screen views in PostHog based on Expo Router route changes.
+ */
+function PostHogScreenTracker() {
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    if (pathname && posthog) {
+      posthog.screen(pathname, params);
+    }
+  }, [pathname, params, posthog]);
+
+  return null;
 }
 
 /**
@@ -85,37 +111,49 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ClerkProvider
-        publishableKey={publishableKey}
-        tokenCache={Platform.OS !== "web" ? tokenCache : undefined}
-      >
-        <ClerkLoading>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              backgroundColor: colors.background,
-            }}
-          >
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
-        </ClerkLoading>
-        <ClerkLoaded>
-          <AuthGate />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.background },
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            <Stack.Screen name="sso-callback" options={{ headerShown: false }} />
-          </Stack>
-        </ClerkLoaded>
-      </ClerkProvider>
-    </View>
+    <PostHogProvider
+      apiKey={posthogApiKey}
+      options={{
+        host: "https://us.i.posthog.com",
+        flushAt: 1,
+        flushInterval: 0,
+      }}
+      autocapture
+      debug={__DEV__}
+    >
+      <PostHogScreenTracker />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ClerkProvider
+          publishableKey={publishableKey}
+          tokenCache={Platform.OS !== "web" ? tokenCache : undefined}
+        >
+          <ClerkLoading>
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: colors.background,
+              }}
+            >
+              <ActivityIndicator size="large" color={colors.accent} />
+            </View>
+          </ClerkLoading>
+          <ClerkLoaded>
+            <AuthGate />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="sso-callback" options={{ headerShown: false }} />
+            </Stack>
+          </ClerkLoaded>
+        </ClerkProvider>
+      </View>
+    </PostHogProvider>
   );
 }

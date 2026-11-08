@@ -18,6 +18,8 @@ import ListHeading from "@/components/ListHeading";
 import UpComingSubscriptionCard from "@/components/UpComingSubscriptionCard";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import { useUser } from "@clerk/expo";
+import { posthog } from "@/lib/posthog";
+import { posthogLogger } from "@/lib/posthog-logger";
 
 const SafeAreaView = styled(RNsafeAreaView);
 
@@ -91,11 +93,15 @@ export default function App() {
           <SubscriptionCard
             {...item}
             expanded={expandedSubscriptionId === item.id}
-            onPress={() =>
+            onPress={() => {
+              const action =
+                expandedSubscriptionId === item.id ? "collapsed" : "expanded";
               setExpandedSubscriptionId((current) =>
                 current === item.id ? null : item.id,
-              )
-            }
+              );
+              posthog?.capture("subscription_details_toggled", { action });
+              posthogLogger.info("subscription details toggled", { action });
+            }}
           />
         )}
         keyExtractor={(item) => item.name}

@@ -1,4 +1,10 @@
-import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth } from "@clerk/expo";
+import {
+  ClerkProvider,
+  ClerkLoaded,
+  ClerkLoading,
+  useAuth,
+  useUser,
+} from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { Stack, useRouter, useSegments, SplashScreen } from "expo-router";
 import "@/global.css";
@@ -7,6 +13,8 @@ import { useEffect, useRef } from "react";
 import { Platform, View, ActivityIndicator } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { colors } from "@/constants/theme";
+import { PostHogProvider } from "@/components/PostHogProvider";
+import { posthog } from "@/lib/posthog";
 
 // Complete any pending auth session
 WebBrowser.maybeCompleteAuthSession();
@@ -28,9 +36,37 @@ if (!publishableKey) {
  */
 function AuthGate() {
   const { isSignedIn, isLoaded } = useAuth();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const segments = useSegments();
   const router = useRouter();
   const hasHiddenSplash = useRef(false);
+  const identifiedUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoaded || !isUserLoaded) return;
+
+    if (isSignedIn && user?.id) {
+      if (identifiedUserId.current === user.id) return;
+
+      if (identifiedUserId.current) {
+        posthog?.reset();
+      }
+
+      posthog?.identify(user.id, {
+        $set: {
+          ...(user.primaryEmailAddress?.emailAddress
+            ? { email: user.primaryEmailAddress.emailAddress }
+            : {}),
+          ...(user.firstName ? { first_name: user.firstName } : {}),
+          ...(user.lastName ? { last_name: user.lastName } : {}),
+        },
+      });
+      identifiedUserId.current = user.id;
+    } else if (identifiedUserId.current) {
+      posthog?.reset();
+      identifiedUserId.current = null;
+    }
+  }, [isLoaded, isSignedIn, isUserLoaded, user]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -86,36 +122,41 @@ export default function RootLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ClerkProvider
-        publishableKey={publishableKey}
-        tokenCache={Platform.OS !== "web" ? tokenCache : undefined}
-      >
-        <ClerkLoading>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              backgroundColor: colors.background,
-            }}
-          >
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
-        </ClerkLoading>
-        <ClerkLoaded>
-          <AuthGate />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.background },
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            <Stack.Screen name="sso-callback" options={{ headerShown: false }} />
-          </Stack>
-        </ClerkLoaded>
-      </ClerkProvider>
+      <PostHogProvider>
+        <ClerkProvider
+          publishableKey={publishableKey}
+          tokenCache={Platform.OS !== "web" ? tokenCache : undefined}
+        >
+          <ClerkLoading>
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: colors.background,
+              }}
+            >
+              <ActivityIndicator size="large" color={colors.accent} />
+            </View>
+          </ClerkLoading>
+          <ClerkLoaded>
+            <AuthGate />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="sso-callback"
+                options={{ headerShown: false }}
+              />
+            </Stack>
+          </ClerkLoaded>
+        </ClerkProvider>
+      </PostHogProvider>
     </View>
   );
 }

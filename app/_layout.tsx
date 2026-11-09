@@ -1,20 +1,20 @@
-import {
-  ClerkProvider,
-  ClerkLoaded,
-  ClerkLoading,
-  useAuth,
-  useUser,
-} from "@clerk/expo";
+import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
-import { Stack, useRouter, useSegments, SplashScreen } from "expo-router";
+import {
+  Stack,
+  useRouter,
+  useSegments,
+  SplashScreen,
+  usePathname,
+  useGlobalSearchParams,
+} from "expo-router";
+import { PostHogProvider, usePostHog } from "posthog-react-native";
 import "@/global.css";
 import { useFonts } from "expo-font";
 import { useEffect, useRef } from "react";
 import { Platform, View, ActivityIndicator } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { colors } from "@/constants/theme";
-import { PostHogProvider } from "@/components/PostHogProvider";
-import { posthog } from "@/lib/posthog";
 
 // Complete any pending auth session
 WebBrowser.maybeCompleteAuthSession();
@@ -23,6 +23,7 @@ WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+const posthogApiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? "";
 
 if (!publishableKey) {
   throw new Error(
@@ -31,42 +32,51 @@ if (!publishableKey) {
 }
 
 /**
+ * Automatically captures screen views in PostHog based on Expo Router route changes.
+ */
+function PostHogScreenTracker() {
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    if (pathname && posthog) {
+      posthog.screen(pathname, params);
+    }
+  }, [pathname, params, posthog]);
+
+  return null;
+}
+
+/**
  * Handles auth-based routing at the root level AND controls when the
  * splash screen is dismissed.
  */
 function AuthGate() {
   const { isSignedIn, isLoaded } = useAuth();
-  const { user, isLoaded: isUserLoaded } = useUser();
+  const { user } = useUser();
+  const posthog = usePostHog();
   const segments = useSegments();
   const router = useRouter();
   const hasHiddenSplash = useRef(false);
-  const identifiedUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isLoaded || !isUserLoaded) return;
+    if (!isLoaded || !posthog) return;
 
     if (isSignedIn && user?.id) {
-      if (identifiedUserId.current === user.id) return;
-
-      if (identifiedUserId.current) {
-        posthog?.reset();
-      }
-
-      posthog?.identify(user.id, {
-        $set: {
-          ...(user.primaryEmailAddress?.emailAddress
-            ? { email: user.primaryEmailAddress.emailAddress }
-            : {}),
-          ...(user.firstName ? { first_name: user.firstName } : {}),
-          ...(user.lastName ? { last_name: user.lastName } : {}),
-        },
+      posthog.identify(user.id, {
+        email:
+          user.primaryEmailAddress?.emailAddress ||
+          user.emailAddresses[0]?.emailAddress ||
+          "",
+        name: user.fullName || user.firstName || "",
       });
-      identifiedUserId.current = user.id;
-    } else if (identifiedUserId.current) {
-      posthog?.reset();
-      identifiedUserId.current = null;
+    } else if (!isSignedIn) {
+      if (posthog.getDistinctId() !== posthog.getAnonymousId()) {
+        posthog.reset();
+      }
     }
-  }, [isLoaded, isSignedIn, isUserLoaded, user]);
+  }, [isSignedIn, isLoaded, user, posthog]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -89,6 +99,9 @@ function AuthGate() {
   return null;
 }
 
+/**
+ * Root application layout managing fonts, analytics provider, Clerk authentication, and navigation stack.
+ */
 export default function RootLayout() {
   const [fontLoaded, fontError] = useFonts({
     "sans-bold": require("../assets/fonts/PlusJakartaSans-Bold.ttf"),
@@ -121,8 +134,18 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <PostHogProvider>
+    <PostHogProvider
+      apiKey={posthogApiKey}
+      options={{
+        host: "https://us.i.posthog.com",
+        disabled: !posthogApiKey,
+        ...(__DEV__ ? { flushAt: 1, flushInterval: 0 } : {}),
+      }}
+      autocapture
+      debug={__DEV__}
+    >
+      <PostHogScreenTracker />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <ClerkProvider
           publishableKey={publishableKey}
           tokenCache={Platform.OS !== "web" ? tokenCache : undefined}
@@ -149,14 +172,11 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="sso-callback"
-                options={{ headerShown: false }}
-              />
+              <Stack.Screen name="sso-callback" options={{ headerShown: false }} />
             </Stack>
           </ClerkLoaded>
         </ClerkProvider>
-      </PostHogProvider>
-    </View>
+      </View>
+    </PostHogProvider>
   );
 }

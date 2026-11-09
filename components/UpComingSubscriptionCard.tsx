@@ -2,6 +2,9 @@ import { View, Text, Image } from "react-native";
 import React from "react";
 import { formatCurrency } from "@/lib/utils";
 
+/**
+ * Card component for upcoming subscriptions showing price and days remaining until renewal.
+ */
 const UpComingSubscriptionCard = ({
   name,
   price,

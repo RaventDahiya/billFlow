@@ -13,13 +13,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { useSignUp, useSSO } from "@clerk/expo";
 import * as Linking from "expo-linking";
-import clsx from "clsx";
+import { clsx } from "clsx";
+import { usePostHog } from "posthog-react-native";
 import { colors } from "@/constants/theme";
-import { posthog } from "@/lib/posthog";
-import { posthogLogger } from "@/lib/posthog-logger";
 
+/**
+ * Screen component handling user registration, email verification, and Google OAuth sign-up.
+ */
 export default function SignUpScreen() {
   const router = useRouter();
+  const posthog = usePostHog();
   const { signUp, errors, fetchStatus } = useSignUp();
   const { startSSOFlow } = useSSO();
 
@@ -32,6 +35,9 @@ export default function SignUpScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSSOSubmitting, setIsSSOSubmitting] = useState(false);
 
+  /**
+   * Initiates sign-up with email and password or sends verification code if required.
+   */
   const handleSignUp = async () => {
     if (!emailAddress.trim() || !password) {
       setFormError("Please enter your email and password.");
@@ -41,6 +47,7 @@ export default function SignUpScreen() {
     try {
       setFormError(null);
       setIsSubmitting(true);
+      posthog?.capture("user_sign_up_initiated", { method: "password" });
 
       const { error } = await signUp.password({
         emailAddress: emailAddress.trim(),
@@ -49,13 +56,16 @@ export default function SignUpScreen() {
 
       if (error) {
         setFormError(error.message);
+        posthog?.capture("user_sign_up_failed", {
+          method: "password",
+          error: error.message,
+        });
         return;
       }
 
       if (signUp.status === "complete") {
         await signUp.finalize();
-        posthog?.capture("account_created", { method: "password" });
-        posthogLogger.info("account created", { method: "password" });
+        posthog?.capture("user_sign_up_completed", { method: "password" });
         router.replace("/(tabs)");
         return;
       }
@@ -68,8 +78,13 @@ export default function SignUpScreen() {
         const { error: sendError } = await signUp.verifications.sendEmailCode();
         if (sendError) {
           setFormError(sendError.message);
+          posthog?.capture("user_sign_up_failed", {
+            method: "password",
+            error: sendError.message,
+          });
           return;
         }
+        posthog?.capture("verification_code_sent");
         setPendingVerification(true);
       }
     } catch (err: any) {
@@ -78,11 +93,18 @@ export default function SignUpScreen() {
         err?.message ??
         "An error occurred during sign up.";
       setFormError(msg);
+      posthog?.capture("user_sign_up_failed", {
+        method: "password",
+        error: msg,
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /**
+   * Verifies the email verification code and finalizes sign-up.
+   */
   const handleVerify = async () => {
     if (!code.trim()) {
       setFormError("Please enter the verification code.");
@@ -99,13 +121,13 @@ export default function SignUpScreen() {
 
       if (error) {
         setFormError(error.message);
+        posthog?.capture("verification_failed", { error: error.message });
         return;
       }
 
       if (signUp.status === "complete") {
         await signUp.finalize();
-        posthog?.capture("account_created", { method: "email_verification" });
-        posthogLogger.info("account created", { method: "email_verification" });
+        posthog?.capture("user_sign_up_completed", { method: "password" });
         router.replace("/(tabs)");
       } else {
         setFormError(`Verification status: ${signUp.status}`);
@@ -116,11 +138,15 @@ export default function SignUpScreen() {
         err?.message ??
         "Verification failed. Please try again.";
       setFormError(msg);
+      posthog?.capture("verification_failed", { error: msg });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /**
+   * Resends the email verification code to the user.
+   */
   const handleResendCode = async () => {
     try {
       setFormError(null);
@@ -137,20 +163,30 @@ export default function SignUpScreen() {
     }
   };
 
+  /**
+   * Initiates and completes the Google OAuth sign-up flow.
+   */
   const handleGoogleSignUp = useCallback(async () => {
     try {
       setFormError(null);
       setIsSSOSubmitting(true);
+      posthog?.capture("user_sign_up_initiated", { method: "google_oauth" });
       const redirectUrl = Linking.createURL("sso-callback");
-      const { createdSessionId, setActive } = await startSSOFlow({
+      const { createdSessionId, setActive, signUp: ssoSignUp } = await startSSOFlow({
         strategy: "oauth_google",
         redirectUrl,
       });
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
-        posthog?.capture("account_created", { method: "google" });
-        posthogLogger.info("account created", { method: "google" });
+        const isNewUser = Boolean(
+          ssoSignUp?.createdUserId || ssoSignUp?.createdSessionId
+        );
+        if (isNewUser) {
+          posthog?.capture("user_sign_up_completed", { method: "google_oauth" });
+        } else {
+          posthog?.capture("user_signed_in", { method: "google_oauth" });
+        }
         router.replace("/(tabs)");
       }
     } catch (err: any) {
@@ -160,10 +196,14 @@ export default function SignUpScreen() {
         err?.message ??
         "Failed to continue with Google.";
       setFormError(msg);
+      posthog?.capture("user_sign_up_failed", {
+        method: "google_oauth",
+        error: msg,
+      });
     } finally {
       setIsSSOSubmitting(false);
     }
-  }, [startSSOFlow, router]);
+  }, [startSSOFlow, router, posthog]);
 
   const isLoading = isSubmitting || fetchStatus === "fetching";
   const emailFieldError = errors?.fields?.emailAddress?.message;

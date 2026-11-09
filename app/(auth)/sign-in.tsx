@@ -13,13 +13,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { useSignIn, useSSO } from "@clerk/expo";
 import * as Linking from "expo-linking";
-import clsx from "clsx";
+import { clsx } from "clsx";
+import { usePostHog } from "posthog-react-native";
 import { colors } from "@/constants/theme";
-import { posthog } from "@/lib/posthog";
-import { posthogLogger } from "@/lib/posthog-logger";
 
+/**
+ * Screen component providing user sign-in via email/password or Google OAuth.
+ */
 export default function SignInScreen() {
   const router = useRouter();
+  const posthog = usePostHog();
   const { signIn, errors, fetchStatus } = useSignIn();
   const { startSSOFlow } = useSSO();
 
@@ -29,6 +32,9 @@ export default function SignInScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSSOSubmitting, setIsSSOSubmitting] = useState(false);
 
+  /**
+   * Handles email and password sign-in submission and PostHog event logging.
+   */
   const handleSignIn = async () => {
     if (!emailAddress.trim() || !password) {
       setFormError("Please enter your email and password.");
@@ -46,13 +52,16 @@ export default function SignInScreen() {
 
       if (error) {
         setFormError(error.message);
+        posthog?.capture("user_sign_in_failed", {
+          method: "password",
+          error: error.message,
+        });
         return;
       }
 
       if (signIn.status === "complete") {
         await signIn.finalize();
         posthog?.capture("user_signed_in", { method: "password" });
-        posthogLogger.info("user signed in", { method: "password" });
         router.replace("/(tabs)");
       } else {
         setFormError(`Sign in requires additional steps: ${signIn.status}`);
@@ -63,25 +72,38 @@ export default function SignInScreen() {
         err?.message ??
         "An error occurred during sign in.";
       setFormError(msg);
+      posthog?.capture("user_sign_in_failed", {
+        method: "password",
+        error: msg,
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /**
+   * Initiates and completes the Google OAuth sign-in flow.
+   */
   const handleGoogleSignIn = useCallback(async () => {
     try {
       setFormError(null);
       setIsSSOSubmitting(true);
       const redirectUrl = Linking.createURL("sso-callback");
-      const { createdSessionId, setActive } = await startSSOFlow({
+      const { createdSessionId, setActive, signUp: ssoSignUp } = await startSSOFlow({
         strategy: "oauth_google",
         redirectUrl,
       });
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
-        posthog?.capture("user_signed_in", { method: "google" });
-        posthogLogger.info("user signed in", { method: "google" });
+        const isNewUser = Boolean(
+          ssoSignUp?.createdUserId || ssoSignUp?.createdSessionId
+        );
+        if (isNewUser) {
+          posthog?.capture("user_sign_up_completed", { method: "google_oauth" });
+        } else {
+          posthog?.capture("user_signed_in", { method: "google_oauth" });
+        }
         router.replace("/(tabs)");
       }
     } catch (err: any) {
@@ -91,10 +113,14 @@ export default function SignInScreen() {
         err?.message ??
         "Failed to sign in with Google.";
       setFormError(msg);
+      posthog?.capture("user_sign_in_failed", {
+        method: "google_oauth",
+        error: msg,
+      });
     } finally {
       setIsSSOSubmitting(false);
     }
-  }, [startSSOFlow, router]);
+  }, [startSSOFlow, router, posthog]);
 
   const isLoading = isSubmitting || fetchStatus === "fetching";
   const emailFieldError = errors?.fields?.identifier?.message;

@@ -1,12 +1,11 @@
 import "@/global.css";
 
-import { FlatList, Image, Text, View } from "react-native";
+import { FlatList, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView as RNsafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
 import images from "@/constants/images";
 import {
   HOME_BALANCE,
-  HOME_SUBSCRIPTIONS,
   HOME_USER,
   UPCOMING_SUBSCRIPTIONS,
 } from "@/constants/data";
@@ -17,17 +16,72 @@ import React, { useState } from "react";
 import ListHeading from "@/components/ListHeading";
 import UpComingSubscriptionCard from "@/components/UpComingSubscriptionCard";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
+import { useSubscriptions } from "@/lib/subscriptions";
 import { useUser } from "@clerk/expo";
-import { posthog } from "@/lib/posthog";
-import { posthogLogger } from "@/lib/posthog-logger";
+import { useRouter } from "expo-router";
+import { usePostHog } from "posthog-react-native";
 
 const SafeAreaView = styled(RNsafeAreaView);
 
+/**
+ * Home screen component displaying balance, upcoming subscriptions, and active subscriptions.
+ */
 export default function App() {
+  const router = useRouter();
   const { user } = useUser();
+  const posthog = usePostHog();
+  const [subscriptions, addSubscription] = useSubscriptions();
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
+
+  /**
+   * Opens the create subscription modal and tracks the event.
+   */
+  const handleOpenCreateModal = () => {
+    posthog?.capture("create_subscription_modal_opened", {
+      source: "home_header",
+    });
+    setIsModalVisible(true);
+  };
+
+  /**
+   * Navigates to the subscriptions tab and logs the interaction.
+   */
+  const handleViewAll = () => {
+    posthog?.capture("view_all_subscriptions_clicked", {
+      total_count: subscriptions.length,
+    });
+    router.push("/(tabs)/subscription");
+  };
+
+  /**
+   * Toggles the expansion state of a subscription card and logs analytics when expanded.
+   */
+  const handleToggleCard = (item: Subscription) => {
+    const isExpanding = expandedSubscriptionId !== item.id;
+    setExpandedSubscriptionId((current) =>
+      current === item.id ? null : item.id
+    );
+    if (isExpanding) {
+      posthog?.capture("subscription_card_expanded", {
+        subscription_id: item.id,
+        subscription_name: item.name,
+        category: item.category ?? "",
+        billing: item.billing,
+        source: "home_screen",
+      });
+    }
+  };
+
+  /**
+   * Adds a newly created subscription to the global subscription store.
+   */
+  const handleAddSubscription = (newSubscription: Subscription) => {
+    addSubscription(newSubscription);
+  };
 
   const userName =
     user?.firstName ||
@@ -52,7 +106,12 @@ export default function App() {
                 )}
                 <Text className="home-user-name">{userName}</Text>
               </View>
-              <Image source={icons.add} className="home-add-icon" />
+              <Pressable
+                onPress={handleOpenCreateModal}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Image source={icons.add} className="home-add-icon" />
+              </Pressable>
             </View>
 
             <View className="home-balance-card">
@@ -85,26 +144,21 @@ export default function App() {
               />
             </View>
 
-            <ListHeading title="All Subscriptions" />
+            <ListHeading
+              title="All Subscriptions"
+              onViewAll={handleViewAll}
+            />
           </>
         }
-        data={HOME_SUBSCRIPTIONS}
+        data={subscriptions}
         renderItem={({ item }) => (
           <SubscriptionCard
             {...item}
             expanded={expandedSubscriptionId === item.id}
-            onPress={() => {
-              const action =
-                expandedSubscriptionId === item.id ? "collapsed" : "expanded";
-              setExpandedSubscriptionId((current) =>
-                current === item.id ? null : item.id,
-              );
-              posthog?.capture("subscription_details_toggled", { action });
-              posthogLogger.info("subscription details toggled", { action });
-            }}
+            onPress={() => handleToggleCard(item)}
           />
         )}
-        keyExtractor={(item) => item.name}
+        keyExtractor={(item) => item.id}
         extraData={expandedSubscriptionId}
         ItemSeparatorComponent={() => <View className="h-4" />}
         showsVerticalScrollIndicator={false}
@@ -113,6 +167,11 @@ export default function App() {
           <Text className="home-empty-state">No subscriptions yet...</Text>
         }
         contentContainerClassName="pb-30"
+      />
+      <CreateSubscriptionModal
+        visible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onSubmit={handleAddSubscription}
       />
     </SafeAreaView>
   );

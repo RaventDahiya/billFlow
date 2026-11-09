@@ -13,11 +13,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { useSignUp, useSSO } from "@clerk/expo";
 import * as Linking from "expo-linking";
-import clsx from "clsx";
+import { clsx } from "clsx";
+import { usePostHog } from "posthog-react-native";
 import { colors } from "@/constants/theme";
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const posthog = usePostHog();
   const { signUp, errors, fetchStatus } = useSignUp();
   const { startSSOFlow } = useSSO();
 
@@ -39,6 +41,7 @@ export default function SignUpScreen() {
     try {
       setFormError(null);
       setIsSubmitting(true);
+      posthog?.capture("user_sign_up_initiated", { method: "password" });
 
       const { error } = await signUp.password({
         emailAddress: emailAddress.trim(),
@@ -47,10 +50,15 @@ export default function SignUpScreen() {
 
       if (error) {
         setFormError(error.message);
+        posthog?.capture("user_sign_up_failed", {
+          method: "password",
+          error: error.message,
+        });
         return;
       }
 
       if (signUp.status === "complete") {
+        posthog?.capture("user_sign_up_completed", { method: "password" });
         await signUp.finalize();
         router.replace("/(tabs)");
         return;
@@ -64,8 +72,13 @@ export default function SignUpScreen() {
         const { error: sendError } = await signUp.verifications.sendEmailCode();
         if (sendError) {
           setFormError(sendError.message);
+          posthog?.capture("user_sign_up_failed", {
+            method: "password",
+            error: sendError.message,
+          });
           return;
         }
+        posthog?.capture("verification_code_sent");
         setPendingVerification(true);
       }
     } catch (err: any) {
@@ -74,6 +87,10 @@ export default function SignUpScreen() {
         err?.message ??
         "An error occurred during sign up.";
       setFormError(msg);
+      posthog?.capture("user_sign_up_failed", {
+        method: "password",
+        error: msg,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -95,10 +112,12 @@ export default function SignUpScreen() {
 
       if (error) {
         setFormError(error.message);
+        posthog?.capture("verification_failed", { error: error.message });
         return;
       }
 
       if (signUp.status === "complete") {
+        posthog?.capture("user_sign_up_completed", { method: "password" });
         await signUp.finalize();
         router.replace("/(tabs)");
       } else {
@@ -110,6 +129,7 @@ export default function SignUpScreen() {
         err?.message ??
         "Verification failed. Please try again.";
       setFormError(msg);
+      posthog?.capture("verification_failed", { error: msg });
     } finally {
       setIsSubmitting(false);
     }
@@ -123,6 +143,7 @@ export default function SignUpScreen() {
       if (error) {
         setFormError(error.message);
       } else {
+        posthog?.capture("verification_code_resent");
         setResendMessage("A new verification code has been sent.");
       }
     } catch (err: any) {
@@ -134,6 +155,7 @@ export default function SignUpScreen() {
     try {
       setFormError(null);
       setIsSSOSubmitting(true);
+      posthog?.capture("user_sign_up_initiated", { method: "google_oauth" });
       const redirectUrl = Linking.createURL("sso-callback");
       const { createdSessionId, setActive } = await startSSOFlow({
         strategy: "oauth_google",
@@ -141,6 +163,7 @@ export default function SignUpScreen() {
       });
 
       if (createdSessionId && setActive) {
+        posthog?.capture("user_sign_up_completed", { method: "google_oauth" });
         await setActive({ session: createdSessionId });
         router.replace("/(tabs)");
       }
@@ -151,10 +174,14 @@ export default function SignUpScreen() {
         err?.message ??
         "Failed to continue with Google.";
       setFormError(msg);
+      posthog?.capture("user_sign_up_failed", {
+        method: "google_oauth",
+        error: msg,
+      });
     } finally {
       setIsSSOSubmitting(false);
     }
-  }, [startSSOFlow, router]);
+  }, [startSSOFlow, router, posthog]);
 
   const isLoading = isSubmitting || fetchStatus === "fetching";
   const emailFieldError = errors?.fields?.emailAddress?.message;

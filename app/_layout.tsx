@@ -1,4 +1,4 @@
-import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth } from "@clerk/expo";
+import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import {
   Stack,
@@ -54,9 +54,27 @@ function PostHogScreenTracker() {
  */
 function AuthGate() {
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const posthog = usePostHog();
   const segments = useSegments();
   const router = useRouter();
   const hasHiddenSplash = useRef(false);
+
+  useEffect(() => {
+    if (!isLoaded || !posthog) return;
+
+    if (isSignedIn && user?.id) {
+      posthog.identify(user.id, {
+        email:
+          user.primaryEmailAddress?.emailAddress ||
+          user.emailAddresses[0]?.emailAddress ||
+          "",
+        name: user.fullName || user.firstName || "",
+      });
+    } else if (!isSignedIn) {
+      posthog.reset();
+    }
+  }, [isSignedIn, isLoaded, user, posthog]);
 
   useEffect(() => {
     if (!isLoaded) return;

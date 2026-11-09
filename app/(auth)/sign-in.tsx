@@ -13,11 +13,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { useSignIn, useSSO } from "@clerk/expo";
 import * as Linking from "expo-linking";
-import clsx from "clsx";
+import { clsx } from "clsx";
+import { usePostHog } from "posthog-react-native";
 import { colors } from "@/constants/theme";
 
 export default function SignInScreen() {
   const router = useRouter();
+  const posthog = usePostHog();
   const { signIn, errors, fetchStatus } = useSignIn();
   const { startSSOFlow } = useSSO();
 
@@ -44,10 +46,15 @@ export default function SignInScreen() {
 
       if (error) {
         setFormError(error.message);
+        posthog?.capture("user_sign_in_failed", {
+          method: "password",
+          error: error.message,
+        });
         return;
       }
 
       if (signIn.status === "complete") {
+        posthog?.capture("user_signed_in", { method: "password" });
         await signIn.finalize();
         router.replace("/(tabs)");
       } else {
@@ -59,6 +66,10 @@ export default function SignInScreen() {
         err?.message ??
         "An error occurred during sign in.";
       setFormError(msg);
+      posthog?.capture("user_sign_in_failed", {
+        method: "password",
+        error: msg,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -75,6 +86,7 @@ export default function SignInScreen() {
       });
 
       if (createdSessionId && setActive) {
+        posthog?.capture("user_signed_in", { method: "google_oauth" });
         await setActive({ session: createdSessionId });
         router.replace("/(tabs)");
       }
@@ -85,10 +97,14 @@ export default function SignInScreen() {
         err?.message ??
         "Failed to sign in with Google.";
       setFormError(msg);
+      posthog?.capture("user_sign_in_failed", {
+        method: "google_oauth",
+        error: msg,
+      });
     } finally {
       setIsSSOSubmitting(false);
     }
-  }, [startSSOFlow, router]);
+  }, [startSSOFlow, router, posthog]);
 
   const isLoading = isSubmitting || fetchStatus === "fetching";
   const emailFieldError = errors?.fields?.identifier?.message;

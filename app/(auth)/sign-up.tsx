@@ -17,6 +17,9 @@ import { clsx } from "clsx";
 import { usePostHog } from "posthog-react-native";
 import { colors } from "@/constants/theme";
 
+/**
+ * Screen component handling user registration, email verification, and Google OAuth sign-up.
+ */
 export default function SignUpScreen() {
   const router = useRouter();
   const posthog = usePostHog();
@@ -32,6 +35,9 @@ export default function SignUpScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSSOSubmitting, setIsSSOSubmitting] = useState(false);
 
+  /**
+   * Initiates sign-up with email and password or sends verification code if required.
+   */
   const handleSignUp = async () => {
     if (!emailAddress.trim() || !password) {
       setFormError("Please enter your email and password.");
@@ -58,8 +64,8 @@ export default function SignUpScreen() {
       }
 
       if (signUp.status === "complete") {
-        posthog?.capture("user_sign_up_completed", { method: "password" });
         await signUp.finalize();
+        posthog?.capture("user_sign_up_completed", { method: "password" });
         router.replace("/(tabs)");
         return;
       }
@@ -96,6 +102,9 @@ export default function SignUpScreen() {
     }
   };
 
+  /**
+   * Verifies the email verification code and finalizes sign-up.
+   */
   const handleVerify = async () => {
     if (!code.trim()) {
       setFormError("Please enter the verification code.");
@@ -117,8 +126,8 @@ export default function SignUpScreen() {
       }
 
       if (signUp.status === "complete") {
-        posthog?.capture("user_sign_up_completed", { method: "password" });
         await signUp.finalize();
+        posthog?.capture("user_sign_up_completed", { method: "password" });
         router.replace("/(tabs)");
       } else {
         setFormError(`Verification status: ${signUp.status}`);
@@ -135,6 +144,9 @@ export default function SignUpScreen() {
     }
   };
 
+  /**
+   * Resends the email verification code to the user.
+   */
   const handleResendCode = async () => {
     try {
       setFormError(null);
@@ -151,6 +163,9 @@ export default function SignUpScreen() {
     }
   };
 
+  /**
+   * Initiates and completes the Google OAuth sign-up flow.
+   */
   const handleGoogleSignUp = useCallback(async () => {
     try {
       setFormError(null);
@@ -163,8 +178,8 @@ export default function SignUpScreen() {
       });
 
       if (createdSessionId && setActive) {
-        posthog?.capture("user_sign_up_completed", { method: "google_oauth" });
         await setActive({ session: createdSessionId });
+        posthog?.capture("user_sign_up_completed", { method: "google_oauth" });
         router.replace("/(tabs)");
       }
     } catch (err: any) {

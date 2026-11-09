@@ -17,6 +17,9 @@ import { clsx } from "clsx";
 import { usePostHog } from "posthog-react-native";
 import { colors } from "@/constants/theme";
 
+/**
+ * Screen component providing user sign-in via email/password or Google OAuth.
+ */
 export default function SignInScreen() {
   const router = useRouter();
   const posthog = usePostHog();
@@ -29,6 +32,9 @@ export default function SignInScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSSOSubmitting, setIsSSOSubmitting] = useState(false);
 
+  /**
+   * Handles email and password sign-in submission and PostHog event logging.
+   */
   const handleSignIn = async () => {
     if (!emailAddress.trim() || !password) {
       setFormError("Please enter your email and password.");
@@ -54,8 +60,8 @@ export default function SignInScreen() {
       }
 
       if (signIn.status === "complete") {
-        posthog?.capture("user_signed_in", { method: "password" });
         await signIn.finalize();
+        posthog?.capture("user_signed_in", { method: "password" });
         router.replace("/(tabs)");
       } else {
         setFormError(`Sign in requires additional steps: ${signIn.status}`);
@@ -75,6 +81,9 @@ export default function SignInScreen() {
     }
   };
 
+  /**
+   * Initiates and completes the Google OAuth sign-in flow.
+   */
   const handleGoogleSignIn = useCallback(async () => {
     try {
       setFormError(null);
@@ -86,8 +95,8 @@ export default function SignInScreen() {
       });
 
       if (createdSessionId && setActive) {
-        posthog?.capture("user_signed_in", { method: "google_oauth" });
         await setActive({ session: createdSessionId });
+        posthog?.capture("user_signed_in", { method: "google_oauth" });
         router.replace("/(tabs)");
       }
     } catch (err: any) {

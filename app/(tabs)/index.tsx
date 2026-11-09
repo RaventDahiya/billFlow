@@ -24,6 +24,9 @@ import { usePostHog } from "posthog-react-native";
 
 const SafeAreaView = styled(RNsafeAreaView);
 
+/**
+ * Home screen component displaying balance, upcoming subscriptions, and active subscriptions.
+ */
 export default function App() {
   const router = useRouter();
   const { user } = useUser();
@@ -34,6 +37,9 @@ export default function App() {
     string | null
   >(null);
 
+  /**
+   * Opens the create subscription modal and tracks the event.
+   */
   const handleOpenCreateModal = () => {
     posthog?.capture("create_subscription_modal_opened", {
       source: "home_header",
@@ -41,6 +47,9 @@ export default function App() {
     setIsModalVisible(true);
   };
 
+  /**
+   * Navigates to the subscriptions tab and logs the interaction.
+   */
   const handleViewAll = () => {
     posthog?.capture("view_all_subscriptions_clicked", {
       total_count: subscriptions.length,
@@ -48,6 +57,9 @@ export default function App() {
     router.push("/(tabs)/subscription");
   };
 
+  /**
+   * Toggles the expansion state of a subscription card and logs analytics when expanded.
+   */
   const handleToggleCard = (item: Subscription) => {
     const isExpanding = expandedSubscriptionId !== item.id;
     setExpandedSubscriptionId((current) =>
@@ -64,6 +76,9 @@ export default function App() {
     }
   };
 
+  /**
+   * Adds a newly created subscription to the global subscription store.
+   */
   const handleAddSubscription = (newSubscription: Subscription) => {
     addSubscription(newSubscription);
   };

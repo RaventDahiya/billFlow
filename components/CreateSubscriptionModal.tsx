@@ -1,3 +1,4 @@
+import { SUBSCRIPTION_CATEGORIES } from "@/constants/data";
 import { icons } from "@/constants/icons";
 import { colors } from "@/constants/theme";
 import { addSubscription } from "@/lib/subscriptions";
@@ -17,16 +18,7 @@ import {
     View,
 } from "react-native";
 
-export const CATEGORIES = [
-    "Entertainment",
-    "AI Tools",
-    "Developer Tools",
-    "Design",
-    "Productivity",
-    "Cloud",
-    "Music",
-    "Other",
-] as const;
+export const CATEGORIES = SUBSCRIPTION_CATEGORIES;
 
 export type Category = (typeof CATEGORIES)[number];
 export type Frequency = "Monthly" | "Yearly";
@@ -37,11 +29,12 @@ export const CATEGORY_COLORS: Record<Category, string> = {
     "Developer Tools": "#e8def8",
     Design: "#ffd6cc",
     Productivity: "#f5e6d3",
-    Cloud: "#cce2ff",
-    Music: "#fed7aa",
-    Other: "#efe5d9",
+    "Cloud Storage": "#cce2ff",
 };
 
+/**
+ * Modal dialog for creating and saving a new subscription with category, price, and billing frequency.
+ */
 export default function CreateSubscriptionModal({
     visible,
     onClose,
@@ -55,10 +48,15 @@ export default function CreateSubscriptionModal({
     const [frequency, setFrequency] = useState<Frequency>("Monthly");
     const [category, setCategory] = useState<Category>("Entertainment");
 
-    const parsedPrice = parseFloat(price);
+    const trimmedPrice = price.trim();
+    const isPriceNumeric = /^(?:\d+(?:\.\d+)?|\.\d+)$/.test(trimmedPrice);
+    const parsedPrice = isPriceNumeric ? parseFloat(trimmedPrice) : NaN;
     const isValid =
         name.trim().length > 0 && !isNaN(parsedPrice) && parsedPrice > 0;
 
+    /**
+     * Resets modal form fields to their default initial values.
+     */
     const resetForm = () => {
         setName("");
         setPrice("");
@@ -66,6 +64,9 @@ export default function CreateSubscriptionModal({
         setCategory("Entertainment");
     };
 
+    /**
+     * Closes the modal, logs dismissal analytics, and resets form fields.
+     */
     const handleClose = () => {
         posthog?.capture("create_subscription_modal_closed", {
             had_name: Boolean(name.trim()),
@@ -75,6 +76,9 @@ export default function CreateSubscriptionModal({
         onClose();
     };
 
+    /**
+     * Validates form inputs, creates the new subscription, and triggers callbacks and analytics.
+     */
     const handleSubmit = () => {
         if (!isValid) return;
 

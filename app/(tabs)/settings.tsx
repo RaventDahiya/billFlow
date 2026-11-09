@@ -5,11 +5,17 @@ import { useUser, useClerk } from "@clerk/expo";
 import { usePostHog } from "posthog-react-native";
 import images from "@/constants/images";
 
+/**
+ * Settings screen displaying user profile details and sign-out controls.
+ */
 export default function SettingsScreen() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const posthog = usePostHog();
 
+  /**
+   * Prompts the user with a confirmation alert and signs out of the application.
+   */
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -19,7 +25,6 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             posthog?.capture("user_signed_out");
-            posthog?.reset();
             await signOut();
           } catch (err: any) {
             Alert.alert("Error", err?.message ?? "Failed to sign out");

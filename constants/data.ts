@@ -1,5 +1,16 @@
 import { icons } from "./icons";
 
+export const SUBSCRIPTION_CATEGORIES = [
+  "Entertainment",
+  "AI Tools",
+  "Developer Tools",
+  "Design",
+  "Productivity",
+  "Cloud Storage",
+] as const;
+
+export type SubscriptionCategory = (typeof SUBSCRIPTION_CATEGORIES)[number];
+
 export const tabs: AppTab[] = [
   { name: "index", title: "Home", icon: icons.home },
   { name: "subscription", title: "Subscriptions", icon: icons.wallet },

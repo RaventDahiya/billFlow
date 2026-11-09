@@ -72,7 +72,9 @@ function AuthGate() {
         name: user.fullName || user.firstName || "",
       });
     } else if (!isSignedIn) {
-      posthog.reset();
+      if (posthog.getDistinctId() !== posthog.getAnonymousId()) {
+        posthog.reset();
+      }
     }
   }, [isSignedIn, isLoaded, user, posthog]);
 
@@ -97,6 +99,9 @@ function AuthGate() {
   return null;
 }
 
+/**
+ * Root application layout managing fonts, analytics provider, Clerk authentication, and navigation stack.
+ */
 export default function RootLayout() {
   const [fontLoaded, fontError] = useFonts({
     "sans-bold": require("../assets/fonts/PlusJakartaSans-Bold.ttf"),
@@ -133,8 +138,7 @@ export default function RootLayout() {
       apiKey={posthogApiKey}
       options={{
         host: "https://us.i.posthog.com",
-        flushAt: 1,
-        flushInterval: 0,
+        ...(__DEV__ ? { flushAt: 1, flushInterval: 0 } : {}),
       }}
       autocapture
       debug={__DEV__}

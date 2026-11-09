@@ -6,6 +6,10 @@ import {
   formatStatusLabel,
 } from "@/lib/utils";
 import clsx from "clsx";
+
+/**
+ * Card component displaying subscription overview and expandable detail rows.
+ */
 const SubscriptionCard = ({
   name,
   price,

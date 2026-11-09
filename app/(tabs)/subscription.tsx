@@ -22,6 +22,9 @@ import { usePostHog } from "posthog-react-native";
 
 const SafeAreaView = styled(RNsafeAreaView);
 
+/**
+ * Screen displaying the user's subscriptions list with search, category filtering, and monthly cost aggregation.
+ */
 export default function SubscriptionsScreen() {
   const posthog = usePostHog();
   const [subscriptions] = useSubscriptions();
@@ -83,6 +86,9 @@ export default function SubscriptionsScreen() {
     }, 0);
   }, [filteredSubscriptions]);
 
+  /**
+   * Resets active search query and category filters to default state.
+   */
   const handleClearFilters = () => {
     posthog?.capture("subscription_filters_cleared", {
       had_search: Boolean(searchQuery),
@@ -92,11 +98,17 @@ export default function SubscriptionsScreen() {
     setSelectedCategory("All");
   };
 
+  /**
+   * Filters displayed subscriptions by the selected category and logs the event.
+   */
   const handleSelectCategory = (cat: string) => {
     setSelectedCategory(cat);
     posthog?.capture("subscription_category_filtered", { category: cat });
   };
 
+  /**
+   * Updates the search query filter state and logs search events for longer queries.
+   */
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
     if (text.trim().length >= 3) {
@@ -104,6 +116,9 @@ export default function SubscriptionsScreen() {
     }
   };
 
+  /**
+   * Toggles the expanded details view of a subscription card and tracks the interaction.
+   */
   const handleToggleCard = (item: Subscription) => {
     const isExpanding = expandedSubscriptionId !== item.id;
     setExpandedSubscriptionId((current) => (current === item.id ? null : item.id));

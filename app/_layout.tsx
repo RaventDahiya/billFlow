@@ -138,6 +138,7 @@ export default function RootLayout() {
       apiKey={posthogApiKey}
       options={{
         host: "https://us.i.posthog.com",
+        disabled: !posthogApiKey,
         ...(__DEV__ ? { flushAt: 1, flushInterval: 0 } : {}),
       }}
       autocapture

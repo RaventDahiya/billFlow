@@ -24,8 +24,8 @@ export default function SettingsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            posthog?.capture("user_signed_out");
             await signOut();
+            posthog?.capture("user_signed_out");
           } catch (err: any) {
             Alert.alert("Error", err?.message ?? "Failed to sign out");
           }

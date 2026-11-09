@@ -21,10 +21,6 @@ export const addSubscription = (newSub: Subscription): Subscription[] => {
 
   currentSubscriptions = [newSub, ...currentSubscriptions];
 
-  if (!HOME_SUBSCRIPTIONS.some((sub) => sub.id === newSub.id)) {
-    HOME_SUBSCRIPTIONS.unshift(newSub);
-  }
-
   listeners.forEach((listener) => listener());
   return currentSubscriptions;
 };

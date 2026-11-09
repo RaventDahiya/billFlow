@@ -221,6 +221,3 @@ export const HOME_SUBSCRIPTIONS: Subscription[] = [
     color: "#efe5d9",
   },
 ];
-
-export const ALL_SUBSCRIPTIONS = HOME_SUBSCRIPTIONS;
-export const SUBSCRIPTIONS = HOME_SUBSCRIPTIONS;

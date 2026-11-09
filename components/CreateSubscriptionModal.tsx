@@ -1,7 +1,6 @@
 import { SUBSCRIPTION_CATEGORIES } from "@/constants/data";
 import { icons } from "@/constants/icons";
 import { colors } from "@/constants/theme";
-import { addSubscription } from "@/lib/subscriptions";
 import { clsx } from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
@@ -39,8 +38,6 @@ export default function CreateSubscriptionModal({
     visible,
     onClose,
     onSubmit,
-    onCreate,
-    onAddSubscription,
 }: CreateSubscriptionModalProps) {
     const posthog = usePostHog();
     const [name, setName] = useState("");
@@ -110,14 +107,9 @@ export default function CreateSubscriptionModal({
             currency: "USD",
         };
 
-        addSubscription(newSubscription);
         onSubmit?.(newSubscription);
-        onCreate?.(newSubscription);
-        onAddSubscription?.(newSubscription);
 
         posthog?.capture("subscription_created", {
-            subscription_id: newSubscription.id,
-            subscription_name: newSubscription.name,
             subscription_price: newSubscription.price,
             subscription_frequency: frequency,
             subscription_category: category,

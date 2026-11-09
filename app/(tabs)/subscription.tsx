@@ -1,6 +1,6 @@
 import "@/global.css";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   ScrollView,
@@ -33,6 +33,7 @@ export default function SubscriptionsScreen() {
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Derive unique categories from dataset
   const categories = useMemo(() => {
@@ -86,10 +87,24 @@ export default function SubscriptionsScreen() {
     }, 0);
   }, [filteredSubscriptions]);
 
+  const filteredCountRef = useRef(filteredSubscriptions.length);
+  filteredCountRef.current = filteredSubscriptions.length;
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   /**
    * Resets active search query and category filters to default state.
    */
   const handleClearFilters = () => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
     posthog?.capture("subscription_filters_cleared", {
       had_search: Boolean(searchQuery),
       previous_category: selectedCategory,
@@ -111,8 +126,19 @@ export default function SubscriptionsScreen() {
    */
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
-    if (text.trim().length >= 3) {
-      posthog?.capture("subscriptions_searched", { query: text.trim() });
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    const trimmedLength = text.trim().length;
+    if (trimmedLength >= 3) {
+      searchTimeoutRef.current = setTimeout(() => {
+        posthog?.capture("subscriptions_searched", {
+          query_length: trimmedLength,
+          result_count: filteredCountRef.current,
+        });
+      }, 300);
     }
   };
 

@@ -89,14 +89,21 @@ export default function SignInScreen() {
       setFormError(null);
       setIsSSOSubmitting(true);
       const redirectUrl = Linking.createURL("sso-callback");
-      const { createdSessionId, setActive } = await startSSOFlow({
+      const { createdSessionId, setActive, signUp: ssoSignUp } = await startSSOFlow({
         strategy: "oauth_google",
         redirectUrl,
       });
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
-        posthog?.capture("user_signed_in", { method: "google_oauth" });
+        const isNewUser = Boolean(
+          ssoSignUp?.createdUserId || ssoSignUp?.createdSessionId
+        );
+        if (isNewUser) {
+          posthog?.capture("user_sign_up_completed", { method: "google_oauth" });
+        } else {
+          posthog?.capture("user_signed_in", { method: "google_oauth" });
+        }
         router.replace("/(tabs)");
       }
     } catch (err: any) {

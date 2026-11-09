@@ -60,8 +60,6 @@ declare global {
     visible: boolean;
     onClose: () => void;
     onSubmit?: (subscription: Subscription) => void;
-    onCreate?: (subscription: Subscription) => void;
-    onAddSubscription?: (subscription: Subscription) => void;
   }
 }
 

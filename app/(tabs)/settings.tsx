@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser, useClerk } from "@clerk/expo";
 import { usePostHog } from "posthog-react-native";
 import images from "@/constants/images";
+import { posthog } from "@/lib/posthog";
 
 /**
  * Settings screen displaying user profile details and sign-out controls.
@@ -24,6 +25,7 @@ export default function SettingsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
+            posthog?.capture("user_signed_out");
             await signOut();
             posthog?.capture("user_signed_out");
           } catch (err: any) {
